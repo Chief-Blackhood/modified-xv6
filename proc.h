@@ -53,6 +53,8 @@ struct proc {
   int iotime;
   int etime;
   int rtime;
+  int priority;
+  int chance;
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -60,3 +62,10 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+// Scheduling algorithms used by scheduler
+
+#define SCHED_RR    0
+#define SCHED_FCFS  1
+#define SCHED_PBS   2
+#define SCHED_MLFQ  3

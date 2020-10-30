@@ -82,6 +82,26 @@ ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
 # FreeBSD ld wants ``elf_i386_fbsd''
 LDFLAGS += -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
 
+SCHED_MACRO = -D SCHEDULER=SCHED_RR
+
+ifeq ($(SCHEDULER), FCFS)
+SCHED_MACRO = -D SCHEDULER=SCHED_FCFS
+endif
+
+ifeq ($(SCHEDULER), PBS)
+SCHED_MACRO = -D SCHEDULER=SCHED_PBS
+endif
+
+ifeq ($(SCHEDULER), MLFQ)
+SCHED_MACRO = -D SCHEDULER=SCHED_MLFQ
+endif
+
+CFLAGS += $(SCHED_MACRO)
+
+ifeq ($(DEBUG), TRUE)
+CFLAGS += -D DEBUG
+endif
+
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
 CFLAGS += -fno-pie -no-pie
@@ -182,6 +202,7 @@ UPROGS=\
 	_wc\
 	_zombie\
 	_time\
+	_benchmark\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -218,7 +239,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 2
+CPUS := 1
 endif
 QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
 
@@ -255,6 +276,7 @@ EXTRA=\
 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
 	.gdbinit.tmpl gdbutil\
 	time.c\
+	benchmark.c\
 
 dist:
 	rm -rf dist

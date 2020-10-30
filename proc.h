@@ -55,6 +55,13 @@ struct proc {
   int rtime;
   int priority;
   int chance;
+
+  //For MLFQ
+  int enter_time;               // For Aging
+  int change_queue;
+  int queue_no;
+  int cur_ticks;
+
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -69,3 +76,12 @@ struct proc {
 #define SCHED_FCFS  1
 #define SCHED_PBS   2
 #define SCHED_MLFQ  3
+
+struct node {
+  struct node *next;
+  struct proc *data;
+  int use;
+};
+
+struct node *queues[5];
+struct node free_nodes[NPROC];

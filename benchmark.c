@@ -2,11 +2,12 @@
 #include "types.h"
 #include "user.h"
 
-int number_of_processes = 2;
+int number_of_processes = 5;
 
 int main(int argc, char *argv[])
 {
   int j;
+  // set_priority(0, getpid());
   for (j = 0; j < number_of_processes; j++)
   {
     int pid = fork();
@@ -20,24 +21,24 @@ int main(int argc, char *argv[])
       volatile int i;
       for (volatile int k = 0; k < number_of_processes; k++)
       {
-        if (k <= j)
-        {
-          sleep(1); //io time
-        }
-        else
-        {
+        // if (k <= j)
+        // {
+        //   sleep(1); //io time
+        // }
+        // else
+        // {
           for (i = 0; i < 100000000; i++)
           {
             ; //cpu time
           }
-        }
+        // }
       }
       printf(1, "Process: %d Finished\n", j);
       exit();
     }
     else{
         ;
-      set_priority(100-(20+j),pid); // will only matter for PBS, comment it out if not implemented yet (better priorty for more IO intensive jobs)
+      // set_priority(50+j%3, pid); // will only matter for PBS, comment it out if not implemented yet (better priorty for more IO intensive jobs)
     }
   }
   for (j = 0; j < number_of_processes; j++)

@@ -203,6 +203,7 @@ UPROGS=\
 	_zombie\
 	_time\
 	_benchmark\
+	_setPriority\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
@@ -277,6 +278,7 @@ EXTRA=\
 	.gdbinit.tmpl gdbutil\
 	time.c\
 	benchmark.c\
+	setPriority.c\
 
 dist:
 	rm -rf dist

@@ -580,8 +580,8 @@ set_priority(int new_priority, int pid)
   curr_proc->priority = new_priority;
 
   #ifdef DEBUG
-    cprintf("Process with id %d and name %s changed its priority from %d to %d\n",curr_proc->pid, curr_proc->name, old_priority, new_priority);
   #endif
+    cprintf("Process with id %d and name %s changed its priority from %d to %d\n",curr_proc->pid, curr_proc->name, old_priority, new_priority);
 
   curr_proc->chance = 0;
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){

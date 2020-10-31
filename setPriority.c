@@ -10,6 +10,9 @@ int main(int argc, char** argv)
         printf(2, "time: Insufficient number of arguments\n");
         exit();
     }
-    set_priority(atoi(argv[1]), atoi(argv[2]));
+    if(set_priority(atoi(argv[1]), atoi(argv[2])) == -1)
+    {
+        printf(1, "An error occured\n");
+    }
     exit();
 }

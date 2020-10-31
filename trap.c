@@ -103,11 +103,13 @@ trap(struct trapframe *tf)
 
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
-  // if(myproc() && myproc()->state == RUNNING &&
-  //    tf->trapno == T_IRQ0+IRQ_TIMER)
-  //   yield();
+  #if SCHEDULER==SCHED_RR || SCHEDULER==SCHED_PBS
+  if(myproc() && myproc()->state == RUNNING &&
+     tf->trapno == T_IRQ0+IRQ_TIMER)
+    yield();
 
   // For MLFQ
+  #elif SCHEDULER==SCHED_MLFQ
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER)
      {
@@ -119,9 +121,10 @@ trap(struct trapframe *tf)
         else if(myproc())
         {
           myproc()->cur_ticks++;
+          myproc()->ticks[myproc()->queue_no]++;
         }  
      }
-
+  #endif
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
     exit();

@@ -137,6 +137,15 @@ found:
   p->queue_no = 0;
   p->change_queue = 0;
 
+  // For PS
+  p->cur_waiting_time = 0;
+  p->n_run = 0;
+  for (int i = 0; i < 5; i++)
+  {
+    p->ticks[i] = 0;
+  }
+  
+
   return p;
 }
 
@@ -171,6 +180,8 @@ inc_time(void)
         p->rtime++;
       else if(p->state == SLEEPING)
         p->iotime++;
+      else if(p->state == RUNNABLE)
+        p->cur_waiting_time++;
     }
 
   release(&ptable.lock);
@@ -253,8 +264,10 @@ userinit(void)
 
   p->state = RUNNABLE;
   // For MLFQ
+  #if SCHEDULER == SCHED_MLFQ
   p->enter_time = ticks;
   queues[0] = push(queues[0], p);
+  #endif
 
   release(&ptable.lock);
 }
@@ -322,8 +335,10 @@ fork(void)
 
   np->state = RUNNABLE;
   // For MLFQ
+  #if SCHEDULER == SCHED_MLFQ
   np->enter_time = ticks;
   queues[0] = push(queues[0], np);
+  #endif
 
   release(&ptable.lock);
 
@@ -467,6 +482,19 @@ waitx(int *wtime, int *rtime)
   }
 }
 
+int
+my_ps()
+{
+  struct proc* p;
+  cprintf("PID\tPriority\tState\t\tr_time\tw_time\tn_run\tcur_q\tq0\tq1\tq2\tq3\tq4\n");
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    char *states[] = { "UNUSED\t", "EMBRYO\t", "SLEEPING", "RUNNABLE", "RUNNING\t", "ZOMBIE\t" };
+    if(p->state != UNUSED)
+      cprintf("%d\t%d\t\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", p->pid, p->priority, states[p->state], p->rtime, p->cur_waiting_time, p->n_run, p->queue_no, p->ticks[0], p->ticks[1], p->ticks[2], p->ticks[3], p->ticks[4]);
+  }
+  return 0;
+}
+
 //PAGEBREAK: 42
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
@@ -478,151 +506,168 @@ waitx(int *wtime, int *rtime)
 void
 scheduler(void)
 {
-  // struct proc *p;
+  #if SCHEDULER != SCHED_MLFQ
+  struct proc *p;
+  #endif
   struct cpu *c = mycpu();
   c->proc = 0;
   
-  // #if SCHEDULER == SCHED_RR
-  //   for(;;){
-  //     // Enable interrupts on this processor.
-  //     sti();
+  #if SCHEDULER == SCHED_RR
+    for(;;){
+      // Enable interrupts on this processor.
+      sti();
 
-  //     // Loop over process table looking for process to run.
-  //     acquire(&ptable.lock);
-  //     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-  //       if(p->state != RUNNABLE)
-  //         continue;
+      // Loop over process table looking for process to run.
+      acquire(&ptable.lock);
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
 
-  //       // #ifdef DEBUG
-  //       //   cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, p->name, p->pid, p->ctime);
-  //       // #endif
+        // #ifdef DEBUG
+        //   cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, p->name, p->pid, p->ctime);
+        // #endif
 
-  //       // Switch to chosen process.  It is the process's job
-  //       // to release ptable.lock and then reacquire it
-  //       // before jumping back to us.
-  //       c->proc = p;
-  //       switchuvm(p);
-  //       p->state = RUNNING;
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+        // before jumping back to us.
+        p->cur_waiting_time = 0;
+        p->n_run++;
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
 
-  //       swtch(&(c->scheduler), p->context);
-  //       switchkvm();
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
 
-  //       // Process is done running for now.
-  //       // It should have changed its p->state before coming back.
-  //       c->proc = 0;
-  //     }
-  //     release(&ptable.lock);
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&ptable.lock);
 
-  //   }
-    // #if (SCHEDULER == SCHED_FCFS)
-    // for(;;){
-    //   // Enable interrupts on this processor.
-    //   sti();
-    //   int min_time = ticks + 50; // infinity for creation time
-    //   struct proc *proc_selected = 0;
+    }
+    #elif SCHEDULER == SCHED_FCFS
+    for(;;){
+      // Enable interrupts on this processor.
+      sti();
+      int min_time = ticks + 50; // infinity for creation time
+      struct proc *proc_selected = 0;
 
-    //   // Loop over process table looking for process to run.
-    //   acquire(&ptable.lock);
-    //   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    //     if(p->state != RUNNABLE)
-    //       continue;
+      // Loop over process table looking for process to run.
+      acquire(&ptable.lock);
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
         
-    //     if(min_time > p->ctime)
-    //     {
-    //       min_time = p->ctime;
-    //       proc_selected = p;
-    //     }
-    //   }
+        if(min_time > p->ctime)
+        {
+          min_time = p->ctime;
+          proc_selected = p;
+        }
+      }
 
-    //   if(proc_selected == 0)
-    //   {
-    //     release(&ptable.lock);
-    //     continue;
-    //   }
+      if(proc_selected == 0)
+      {
+        release(&ptable.lock);
+        continue;
+      }
 
-    //   #ifdef DEBUG
-    //     cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
-    //   #endif
-    //   // Switch to chosen process.  It is the process's job
-    //   // to release ptable.lock and then reacquire it
-    //   // before jumping back to us.
-    //   c->proc = proc_selected;
-    //   switchuvm(proc_selected);
-    //   proc_selected->state = RUNNING;
-    //   // cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
+      #ifdef DEBUG
+        cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
+      #endif
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      proc_selected->cur_waiting_time = 0;
+      proc_selected->n_run++;
+      c->proc = proc_selected;
+      switchuvm(proc_selected);
+      proc_selected->state = RUNNING;
+      // cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
 
-    //   swtch(&(c->scheduler), proc_selected->context);
-    //   switchkvm();
+      swtch(&(c->scheduler), proc_selected->context);
+      switchkvm();
 
-    //   // Process is done running for now.
-    //   // It should have changed its p->state before coming back.
-    //   c->proc = 0;
-    //   release(&ptable.lock);
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&ptable.lock);
 
-    // }
-  // #elif SCHEDULER == SCHED_PBS
-    // for(;;){
-    //   // Enable interrupts on this processor.
-    //   sti();
-    //   struct proc *proc_selected = 0;
+    }
+  #elif SCHEDULER == SCHED_PBS
+    for(;;){
+      // Enable interrupts on this processor.
+      sti();
+      struct proc *proc_selected = 0;
+      int reset_chance = 1;
 
-    //   // Loop over process table looking for process to run.
-    //   acquire(&ptable.lock);
-    //   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    //     if(p->state != RUNNABLE)
-    //       continue;
-    //     if(proc_selected == 0)
-    //     {
-    //       proc_selected = p;
-    //     }
-    //     else if(proc_selected->priority > p->priority || (proc_selected->priority == p->priority && proc_selected->chance > p->chance))
-    //     {
-    //       proc_selected = p;
-    //     }
-    //   }
+      // Loop over process table looking for process to run.
+      acquire(&ptable.lock);
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state != RUNNABLE)
+          continue;
+        if(proc_selected == 0)
+        {
+          proc_selected = p;
+        }
+        else if(proc_selected->priority > p->priority || (proc_selected->priority == p->priority && proc_selected->chance > p->chance))
+        {
+          proc_selected = p;
+        }
+      }
 
-    //   if(proc_selected == 0)
-    //   {
-    //     release(&ptable.lock);
-    //     continue;
-    //   }
+      if(proc_selected == 0)
+      {
+        release(&ptable.lock);
+        continue;
+      }
 
-    //   #ifdef DEBUG
-    //     cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and priority: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->priority);
-    //   #endif
-    //   // Switch to chosen process.  It is the process's job
-    //   // to release ptable.lock and then reacquire itcprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and priority: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->priority);
-    //   // before jumping back to us.
-    //   proc_selected->chance++;
-    //   c->proc = proc_selected;
-    //   switchuvm(proc_selected);
-    //   proc_selected->state = RUNNING;
-    //   // cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
+      #ifdef DEBUG
+        cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and priority: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->priority);
+      #endif
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire itcprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and priority: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->priority);
+      // before jumping back to us.
+      proc_selected->chance++;
+      proc_selected->cur_waiting_time = 0;
+      proc_selected->n_run++;
+      c->proc = proc_selected;
+      switchuvm(proc_selected);
+      proc_selected->state = RUNNING;
+      // cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
 
-    //   swtch(&(c->scheduler), proc_selected->context);
-    //   switchkvm();
+      swtch(&(c->scheduler), proc_selected->context);
+      switchkvm();
 
-    //   // Process is done running for now.
-    //   // It should have changed its p->state before coming back.
-    //   c->proc = 0;
-    //   release(&ptable.lock);
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+        if(p->state!=RUNNABLE)
+          continue;
+        if(p->priority == proc_selected->priority && proc_selected->chance != p->chance)
+        {
+          reset_chance = 0;
+          break;
+        }
+      }
+      for(p = ptable.proc; p < &ptable.proc[NPROC] && reset_chance; p++){
+        if(p->state!=RUNNABLE)
+          continue;
+        if(p->priority == proc_selected->priority)
+        {
+          p->chance = 0;
+        }
+      }
+      release(&ptable.lock);
 
-    // }
+    }
 
-  // #elif SCHEDULER == SCHED_MLFQ
+  #elif SCHEDULER == SCHED_MLFQ
   for(;;)
   {
     sti();
-    //For debugging
-    // struct node* temp = queues[0];
-    // while(temp!=0)
-    // {
-    //   cprintf("%s", temp->data->name);
-    //   temp=temp->next;
-    // }
 
-
-    // Actual code
     acquire(&ptable.lock);
     for(int i = 0; i < 5; i++)
     {
@@ -637,10 +682,12 @@ scheduler(void)
 
     for(int i = 1;i < 5; i++)
     {
-      while((length(queues[i]) > 0) && (ticks - queues[i]->data->enter_time > 25))
+      while((length(queues[i]) > 0) && (ticks - queues[i]->data->enter_time > 60))
       {
+        cprintf("Pid: %d is promoted from queue number: %d\n", queues[i]->data->pid, queues[i]->data->queue_no);
         struct proc* temp = queues[i]->data;
         queues[i] = pop(queues[i]);
+        temp->cur_waiting_time = 0;
         temp->cur_ticks = 0;
         temp->queue_no--;
         temp->enter_time = ticks;
@@ -669,6 +716,8 @@ scheduler(void)
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
+    selected_proc->cur_waiting_time = 0;
+    selected_proc->n_run++;
     c->proc = selected_proc;
     switchuvm(selected_proc);
     selected_proc->state = RUNNING;
@@ -693,6 +742,7 @@ scheduler(void)
       selected_proc->change_queue = 0;
       if(selected_proc->queue_no != 4)
       {
+        cprintf("Pid: %d is demoted from queue number: %d\n", selected_proc->pid, selected_proc->queue_no);
         selected_proc->queue_no++;
       }
       queues[selected_proc->queue_no] = push(queues[selected_proc->queue_no], selected_proc);
@@ -701,7 +751,7 @@ scheduler(void)
     release(&ptable.lock);
   }
 
-  // #endif
+  #endif
 }
 
 // Enter scheduler.  Must hold only ptable.lock
@@ -735,7 +785,6 @@ set_priority(int new_priority, int pid)
 {
   struct proc *p;
   struct proc *curr_proc = 0;
-  int max_chances = -1;
   int old_priority;
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -750,39 +799,19 @@ set_priority(int new_priority, int pid)
     release(&ptable.lock);
     return -1;
   }
+  if(new_priority > 100 || new_priority < 0)
+  {
+    release(&ptable.lock);
+    return -1;
+  }
   old_priority = curr_proc->priority;
   curr_proc->priority = new_priority;
 
   #ifdef DEBUG
   #endif
-    cprintf("Process with id %d and name %s changed its priority from %d to %d\n",curr_proc->pid, curr_proc->name, old_priority, new_priority);
+    // cprintf("Process with id %d and name %s changed its priority from %d to %d\n",curr_proc->pid, curr_proc->name, old_priority, new_priority);
 
   curr_proc->chance = 0;
-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->priority == new_priority)
-    {
-      if(max_chances < p->chance)
-      {
-        max_chances = p->chance;
-      }
-    }
-  }
-  if(max_chances != 0)
-  {
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->priority == new_priority)
-      {
-        if(p->chance == max_chances)
-        {
-          p->chance = 1;
-        }
-        else
-        {
-          p->chance = 0;
-        }  
-      }
-    }
-  }
   release(&ptable.lock);
   if(curr_proc->priority < old_priority)
   {
@@ -874,10 +903,12 @@ wakeup1(void *chan)
     {
       p->state = RUNNABLE;
       // cprintf("Inside wakeup1, pid: %d name: %s", p->pid,p->name);
+      #if SCHEDULER == SCHED_MLFQ
       p->cur_ticks = 0;
       p->enter_time = ticks;
       p->change_queue = 0;
       queues[p->queue_no] = push(queues[p->queue_no], p);
+      #endif
     }
 }
 
@@ -906,10 +937,12 @@ kill(int pid)
       if(p->state == SLEEPING)
       {
         p->state = RUNNABLE;
+        #if SCHEDULER == SCHED_MLFQ
         p->cur_ticks = 0;
         p->enter_time = ticks;
         p->change_queue = 0;
         queues[p->queue_no] = push(queues[p->queue_no], p);
+        #endif
       }
       release(&ptable.lock);
       return 0;

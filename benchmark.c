@@ -1,8 +1,7 @@
-
 #include "types.h"
 #include "user.h"
 
-int number_of_processes = 5;
+int number_of_processes = 10;
 
 int main(int argc, char *argv[])
 {
@@ -23,7 +22,7 @@ int main(int argc, char *argv[])
       {
         // if (k <= j)
         // {
-        //   sleep(1); //io time
+        //   sleep(200); //io time
         // }
         // else
         // {
@@ -33,17 +32,17 @@ int main(int argc, char *argv[])
           }
         // }
       }
-      printf(1, "Process: %d Finished\n", j);
+      printf(1, "Process: %d Finished pid: %d\n", j, getpid());
       exit();
     }
     else{
         ;
-      // set_priority(50+j%3, pid); // will only matter for PBS, comment it out if not implemented yet (better priorty for more IO intensive jobs)
+      // set_priority(80+j%3, pid); // will only matter for PBS, comment it out if not implemented yet (better priorty for more IO intensive jobs)
     }
   }
   for (j = 0; j < number_of_processes; j++)
   {
-    wait();
+    // wait();
   }
   exit();
 }

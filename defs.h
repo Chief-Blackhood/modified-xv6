@@ -123,6 +123,7 @@ void            yield(void);
 int             waitx(int *, int *);
 void            inc_time(void);
 int             set_priority(int, int);
+int             my_ps(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

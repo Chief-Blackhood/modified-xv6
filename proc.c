@@ -128,13 +128,22 @@ found:
   p->rtime = 0;
   p->etime = 0;
   p->iotime = 0;
+
+  #if SCHEDULER == SCHED_PBS
   p->priority = 60;
   p->chance = 0;
+  #else
+  p->priority = -1;
+  #endif
 
   // For MLFQ
   p->cur_ticks = 0;
   p->enter_time = ticks;
+  #if SCHEDULER == SCHED_MLFQ
   p->queue_no = 0;
+  #else
+  p->queue_no = -1;
+  #endif
   p->change_queue = 0;
 
   // For PS
@@ -142,7 +151,11 @@ found:
   p->n_run = 0;
   for (int i = 0; i < 5; i++)
   {
+    #if SCHEDULER == SCHED_MLFQ
     p->ticks[i] = 0;
+    #else
+    p->ticks[i] = -1;
+    #endif
   }
   
 
@@ -182,6 +195,11 @@ inc_time(void)
         p->iotime++;
       else if(p->state == RUNNABLE)
         p->cur_waiting_time++;
+
+      // if(p->pid > 3 && (p->state == SLEEPING ||  p->state == RUNNABLE || p->state == RUNNING))
+      // {
+      //   cprintf("%d %d %d\n", p->pid, p->queue_no, ticks);
+      // }
     }
 
   release(&ptable.lock);
@@ -583,7 +601,6 @@ scheduler(void)
       c->proc = proc_selected;
       switchuvm(proc_selected);
       proc_selected->state = RUNNING;
-      // cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
 
       swtch(&(c->scheduler), proc_selected->context);
       switchkvm();
@@ -634,7 +651,6 @@ scheduler(void)
       c->proc = proc_selected;
       switchuvm(proc_selected);
       proc_selected->state = RUNNING;
-      // cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d and creation time: %d\n", c->apicid, proc_selected->name, proc_selected->pid, proc_selected->ctime);
 
       swtch(&(c->scheduler), proc_selected->context);
       switchkvm();
@@ -682,9 +698,11 @@ scheduler(void)
 
     for(int i = 1;i < 5; i++)
     {
-      while((length(queues[i]) > 0) && (ticks - queues[i]->data->enter_time > 60))
+      while((length(queues[i]) > 0) && (ticks - queues[i]->data->enter_time > 30))
       {
+        #ifdef DEBUG
         cprintf("Pid: %d is promoted from queue number: %d\n", queues[i]->data->pid, queues[i]->data->queue_no);
+        #endif
         struct proc* temp = queues[i]->data;
         queues[i] = pop(queues[i]);
         temp->cur_waiting_time = 0;
@@ -711,8 +729,6 @@ scheduler(void)
       continue;
     }
 
-    // cprintf("On core: %d\nScheduling\nProcess name: %s with pid: %d\n", c->apicid, selected_proc->name, selected_proc->pid);
-    // cprintf(".\n");
     // Switch to chosen process.  It is the process's job
     // to release ptable.lock and then reacquire it
     // before jumping back to us.
@@ -724,7 +740,6 @@ scheduler(void)
 
     swtch(&(c->scheduler), selected_proc->context);
     switchkvm();
-    // cprintf("..\n");
     // Process is done running for now.
     // It should have changed its p->state before coming back.
     c->proc = 0;
@@ -742,7 +757,9 @@ scheduler(void)
       selected_proc->change_queue = 0;
       if(selected_proc->queue_no != 4)
       {
+        #ifdef DEBUG
         cprintf("Pid: %d is demoted from queue number: %d\n", selected_proc->pid, selected_proc->queue_no);
+        #endif
         selected_proc->queue_no++;
       }
       queues[selected_proc->queue_no] = push(queues[selected_proc->queue_no], selected_proc);
@@ -808,8 +825,8 @@ set_priority(int new_priority, int pid)
   curr_proc->priority = new_priority;
 
   #ifdef DEBUG
+    cprintf("Process with id %d and name %s changed its priority from %d to %d\n",curr_proc->pid, curr_proc->name, old_priority, new_priority);
   #endif
-    // cprintf("Process with id %d and name %s changed its priority from %d to %d\n",curr_proc->pid, curr_proc->name, old_priority, new_priority);
 
   curr_proc->chance = 0;
   release(&ptable.lock);

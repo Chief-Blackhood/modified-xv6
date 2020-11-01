@@ -1,10 +1,6 @@
 # Assignment 5: Enhancing xv6 OS
 
----
-
 ## Task 1
-
----
 
 ### waitx
 
@@ -108,8 +104,6 @@ scheduler or if a change in the queue takes place (because of aging).
 
 A process can exploite the above scheduler algorithm by doing a redundent I/O just before its time slice of a particular queue is getting over. The CPU would think that it is a I/O bound or interactive process but in reality the process could be an intensive CPU bound process. Still the process can ensure that it gets more priority and remain in a higher priority queue.
 
----
-
 ## Comparison
 
 The same set of processes were ran under different  scheduling algorithm. They were running command `benchmark`. (NOTE my_ps() function was used to calculate the total waiting and running time of all the children spawned by benchmark. Also, my_ps() was modified to get the total waiting time of each process. These changes are commented out in the actual code)
@@ -124,8 +118,6 @@ The same set of processes were ran under different  scheduling algorithm. They w
 It can be seen that for processes which have same structure, all the algorithms have same running time but we can see that FCFS has the least waiting time. This means that the cpu spent very less time deciding which process to take up next and did not preempt the process which was running on it.
 
 On the other side MLFQ has a longer waiting time as it takes more things into consideration and these decisions eat up CPU time thereby making the total waiting time more than FCFS.
-
----
 
 ## BONUS
 
